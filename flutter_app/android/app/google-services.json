@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "659003870914",
+    "project_id": "pixel-76562",
+    "storage_bucket": "pixel-76562.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:659003870914:android:40171be78887243a28755b",
+        "android_client_info": {
+          "package_name": "com.example.safewalk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB73CkF90A0kW1gjejfTLanCfdNHhSXNG4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
