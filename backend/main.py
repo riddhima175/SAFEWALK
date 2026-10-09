@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 import uuid
 
@@ -13,13 +14,34 @@ db = firestore.client()
 
 app = FastAPI(title="SafeWalk Backend")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class JourneyStart(BaseModel):
     user_id: str
     destination: str
-    arrival_time: str
+    arrival_time: datetime
     code_word: str
 
+    @field_validator("user_id", "destination", "code_word")
+    @classmethod
+    def must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("This field cannot be blank")
+        return value.strip()
+
+    @field_validator("arrival_time")
+    @classmethod
+    def arrival_must_be_future(cls, value: datetime) -> datetime:
+        if value <= datetime.now():
+            raise ValueError("Arrival time must be in the future")
+        return value
 
 class JourneyResponse(BaseModel):
     journey_id: str
@@ -72,15 +94,24 @@ def respond_to_journey(data: JourneyResponse):
 
     journey_doc = journeys_ref.document(data.journey_id).get()
 
+    
     if not journey_doc.exists:
         return {
             "success": False,
             "message": "Journey not found"
         }
 
+      
     journey = journey_doc.to_dict()
 
-    if data.response == journey["code_word"]:
+    if journey.get("status") == "safe":
+        return {
+            "success": True,
+            "status": "safe",
+            "message": "User is already marked safe. No escalation needed."
+        }
+
+    if data.response.strip().lower() == journey["code_word"].strip().lower():
         journeys_ref.document(data.journey_id).update({
             "status": "safe"
         })
@@ -116,9 +147,9 @@ def respond_to_journey(data: JourneyResponse):
             "alert_id": alert_id,
             "message": "Incorrect code word - Tier 1 escalation triggered"
         }
+
 @app.post("/journey/timeout")
 def journey_timeout(data: JourneyTimeout):
-
     journey_doc = journeys_ref.document(data.journey_id).get()
 
     if not journey_doc.exists:
@@ -127,6 +158,15 @@ def journey_timeout(data: JourneyTimeout):
             "message": "Journey not found"
         }
 
+
+    journey = journey_doc.to_dict()
+
+    if journey.get("status") == "safe":
+        return {
+            "success": True,
+            "status": "safe",
+            "message": "User is safe. No escalation needed."
+        }
     if data.tier == 1:
         alert_type = "FAMILY_SMS"
 
@@ -167,10 +207,12 @@ def journey_timeout(data: JourneyTimeout):
     }
 
 
+from pydantic import BaseModel, Field, field_validator
+
 class LocationUpdate(BaseModel):
     journey_id: str
-    latitude: float
-    longitude: float
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
 
 
 @app.post("/location")
